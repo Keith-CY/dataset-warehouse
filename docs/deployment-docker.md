@@ -94,11 +94,45 @@ Object store -> durable S3-compatible backend
 Required production changes before go-live:
 
 - Replace the in-memory `LakeFSClient` with a real lakeFS REST/S3 client.
+- Replace the development-only `x-dataset-role` header with real API authentication and role mapping.
 - Store lakeFS access keys and object-store credentials in a secret manager.
 - Use persistent PostgreSQL storage with backups and restore drills.
 - Use a durable S3-compatible backend, not the container-local blockstore.
 - Configure branch protection for `main` and release branches/tags.
 - Run lakeFS garbage collection only with a retention policy tied to dataset reproducibility.
+
+## Production Authentication
+
+The local Dataset API examples use `x-dataset-role` only to exercise role checks.
+Production deployments must not trust caller-supplied role headers.
+
+Recommended production auth shape:
+
+```text
+Client / Pipeline / Training Job
+        |
+        | Authorization: Bearer <token>
+        v
+Dataset API auth middleware
+        |
+        | verify token, map groups/service account to dataset role
+        v
+Dataset API route handlers
+        |
+        | lakeFS service account credentials from secret manager
+        v
+lakeFS
+```
+
+Implementation requirements:
+
+- Put the Dataset API behind TLS.
+- Verify tokens from SSO/OIDC, an internal auth proxy, or a service-account issuer.
+- Map trusted identity claims to `viewer`, `trainer`, `data-engineer`, `ci-pipeline`, or `dataset-admin`.
+- Reject requests that include only `x-dataset-role` in production mode.
+- Use separate service accounts for Dataset API, CI pipelines, and training jobs.
+- Keep lakeFS credentials and object-store credentials server-side.
+- Issue presigned URLs with short expirations and object-path scope.
 
 ## S3-Compatible Backend
 

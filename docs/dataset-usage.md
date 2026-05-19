@@ -11,9 +11,50 @@ REPO=llm-datasets
 ROLE_HEADER='x-dataset-role: data-engineer'
 ```
 
-Use `viewer` or `trainer` for read-only calls, `data-engineer` for development
-branches, `ci-pipeline` for pipeline branches, and `dataset-admin` for protected
-operations such as release tags or merges to `main`.
+## Authentication And Roles
+
+The current local API uses `x-dataset-role` as a development-only role stub. It
+is not production authentication. It exists so local tests and examples can
+exercise authorization rules before a real identity provider is wired in.
+
+Local development examples:
+
+```bash
+curl -sS -H 'x-dataset-role: viewer' "$BASE/api/..."
+curl -sS -H 'x-dataset-role: data-engineer' "$BASE/api/..."
+curl -sS -H 'x-dataset-role: dataset-admin' "$BASE/api/..."
+```
+
+Role meanings:
+
+| Role | Intended use |
+| --- | --- |
+| `viewer` | Read object listings and dataset metadata. |
+| `trainer` | Read committed datasets and request download URLs. |
+| `data-engineer` | Write `dev`, `staging`, and `exp/*` branches. |
+| `ci-pipeline` | Write `pipeline/*` branches and promote pipeline output to `staging`. |
+| `dataset-admin` | Create release tags and perform protected operations such as merges to `main`. |
+
+Production deployments must replace `x-dataset-role` with real authentication
+and authorization:
+
+- Users authenticate with SSO/OIDC, an internal auth proxy, or another identity provider.
+- Pipelines and training jobs use service accounts, not human user tokens.
+- The API derives dataset roles from trusted identity claims, groups, or policy data.
+- lakeFS access keys and object-store credentials are stored as secrets and are not sent to browsers.
+- Presigned upload/download URLs must be short-lived and scoped to one object path and ref.
+- Object-store buckets remain private; users write through lakeFS/Dataset API workflows only.
+
+Example production request shape:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $DATASET_API_TOKEN" \
+  "$BASE/api/repos/$REPO/refs/7f23a9d4c0/objects?prefix=pretrain/mix/v1/"
+```
+
+The bearer-token form above is the intended production client shape. The current
+MVP code still expects `x-dataset-role` until the real auth middleware is added.
 
 ## Query Dataset Objects
 
