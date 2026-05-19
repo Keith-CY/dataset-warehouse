@@ -1,0 +1,24 @@
+storage_backends:
+  primary:
+    type: minio
+    endpoint: https://object-store.internal
+    region: us-east-1
+    bucket: lakefs-blockstore
+    namespace_prefix: datasets
+    path_style: true
+    tls: true
+    credentials_ref: secret://storage/primary
+    capabilities:
+      multipart_upload: true
+      presigned_url: true
+      versioning: true
+      object_lock: false
+      lifecycle: true
+      replication: false
+      metrics: true
+
+repository_bindings:
+  - repo: llm-datasets
+    backend: primary
+    storage_namespace: s3://lakefs-blockstore/datasets/llm-datasets
+    immutable_after_create: true
