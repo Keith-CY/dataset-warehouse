@@ -56,6 +56,98 @@ curl -sS \
 The bearer-token form above is the intended production client shape. The current
 MVP code still expects `x-dataset-role` until the real auth middleware is added.
 
+## Direct lakeFS REST API
+
+For single-user operations, administration, smoke tests, or scripts that bypass
+the Dataset API intentionally, call the lakeFS REST API directly. lakeFS API
+Server authentication uses HTTP Basic Auth with the lakeFS access key ID as the
+username and the secret access key as the password:
+
+```text
+Authorization: Basic base64(access_key_id:secret_access_key)
+```
+
+With `curl`, use `-u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY"`.
+
+Load credentials from a secret file or environment variables:
+
+```bash
+. /data/credentials/dataset-warehouse.env
+
+LAKEFS_API="http://lakefs.example.internal:8000/api/v1"
+REPO=llm-datasets
+```
+
+The credential file should define:
+
+```bash
+LAKEFS_ACCESS_KEY_ID=...
+LAKEFS_SECRET_ACCESS_KEY=...
+```
+
+List repositories:
+
+```bash
+curl -sS -u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY" \
+  "$LAKEFS_API/repositories"
+```
+
+List objects under a ref and prefix:
+
+```bash
+curl -sS -u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY" \
+  "$LAKEFS_API/repositories/$REPO/refs/main/objects/ls?prefix=probes/"
+```
+
+Upload an object to a branch:
+
+```bash
+printf 'hello dataset warehouse\n' > example.txt
+
+curl -sS -u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY" \
+  -X POST \
+  "$LAKEFS_API/repositories/$REPO/branches/main/objects?path=probes/example.txt" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @example.txt
+```
+
+Commit staged changes:
+
+```bash
+curl -sS -u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY" \
+  -X POST \
+  "$LAKEFS_API/repositories/$REPO/branches/main/commits" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"upload example.txt"}'
+```
+
+Read object content:
+
+```bash
+curl -sS -u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY" \
+  "$LAKEFS_API/repositories/$REPO/refs/main/objects?path=probes/example.txt" \
+  -o example.txt
+```
+
+For paths or prefixes with spaces, `#`, `?`, non-ASCII characters, or other
+reserved URL characters, let `curl` encode the query value:
+
+```bash
+curl -sS -G -u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY" \
+  "$LAKEFS_API/repositories/$REPO/refs/main/objects" \
+  --data-urlencode "path=probes/example with space.txt"
+```
+
+Branch, tag, and ref names used inside URL path segments also need URL encoding
+when they contain `/` or other reserved characters. For example,
+`exp/alice/upload-20260519` should be sent as
+`exp%2Falice%2Fupload-20260519` in a direct lakeFS REST path.
+
+Direct writes to `main` are acceptable for a single-user smoke test only. In
+production, write to `exp/*` or `pipeline/*`, validate the manifest, commit the
+branch, and promote through the normal merge gate to `staging` and `main`.
+Never expose lakeFS access keys in browser code or frontend configuration.
+
 ## Query Dataset Objects
 
 List objects under a ref and prefix:

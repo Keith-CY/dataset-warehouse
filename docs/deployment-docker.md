@@ -178,6 +178,18 @@ Implementation requirements:
 - Keep lakeFS credentials and object-store credentials server-side.
 - Issue presigned URLs with short expirations and object-path scope.
 
+Direct lakeFS REST API calls use lakeFS access keys with HTTP Basic Auth:
+
+```text
+Authorization: Basic base64(access_key_id:secret_access_key)
+```
+
+This is appropriate for administrative scripts, single-user smoke tests, and
+trusted automation. It is not a replacement for Dataset API authentication in
+multi-user product flows. Dataset API clients should authenticate to the Dataset
+API; the Dataset API should use server-side lakeFS credentials when it calls
+lakeFS.
+
 ## S3-Compatible Backend
 
 The production default is MinIO, but the Dataset API should not depend on
