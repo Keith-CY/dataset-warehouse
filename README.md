@@ -60,3 +60,8 @@ separate operational workflow.
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md).
+
+## Deployment And Usage
+
+- [Docker deployment](docs/deployment-docker.md)
+- [Dataset usage](docs/dataset-usage.md)
