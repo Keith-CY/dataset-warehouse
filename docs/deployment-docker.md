@@ -11,7 +11,9 @@ The target service stack has four parts:
 - Dataset API: the thin API layer in this repository.
 - lakeFS: dataset version control and web UI.
 - PostgreSQL: lakeFS metadata database.
-- S3-compatible object storage: MinIO, AIStor, Ceph RGW, AWS S3, R2, or another compatible backend.
+- S3-compatible object storage: MinIO by default. AIStor, Ceph RGW,
+  AWS S3, R2, or another compatible backend can replace it later through the
+  storage backend abstraction.
 
 The current repository implements the Dataset API skeleton and an in-memory
 lakeFS client for local API testing. A production deployment must replace that
@@ -81,14 +83,55 @@ bun test
 
 ## Production Docker Shape
 
-For production, run the Dataset API and lakeFS as separate services. Keep
-PostgreSQL and the object store as durable state services.
+For production Docker deployments, the default object store is MinIO. PostgreSQL
+metadata and MinIO object data must be persisted with Docker named volumes.
+Run the Dataset API and lakeFS as separate services; keep PostgreSQL and MinIO
+as durable state services.
 
 ```text
 dataset-api  -> lakeFS API / lakeFS S3 Gateway
-lakeFS       -> PostgreSQL + S3-compatible object storage
-PostgreSQL   -> persistent metadata volume / managed database
-Object store -> durable S3-compatible backend
+lakeFS       -> PostgreSQL + MinIO
+PostgreSQL   -> Docker volume: dataset-warehouse-postgres-data
+MinIO        -> Docker volume: dataset-warehouse-minio-data
+```
+
+The production compose template is:
+
+```text
+deploy/docker-compose.production.yml
+```
+
+Create an environment file:
+
+```bash
+cp deploy/.env.example .env
+```
+
+Edit `.env` and replace all placeholder secrets. Then start the stack:
+
+```bash
+docker compose \
+  --env-file .env \
+  -f deploy/docker-compose.production.yml \
+  -p dataset-warehouse \
+  up -d
+```
+
+Open the service UIs:
+
+```text
+lakeFS UI:       http://127.0.0.1:8000/setup
+MinIO Console:  http://127.0.0.1:9001/
+MinIO S3 API:   http://127.0.0.1:9000/
+```
+
+The compose file creates the `lakefs-blockstore` bucket automatically through
+the `minio-init` service. lakeFS is configured with:
+
+```text
+LAKEFS_BLOCKSTORE_TYPE=s3
+LAKEFS_BLOCKSTORE_S3_ENDPOINT=http://minio:9000
+LAKEFS_BLOCKSTORE_S3_FORCE_PATH_STYLE=true
 ```
 
 Required production changes before go-live:
@@ -97,7 +140,8 @@ Required production changes before go-live:
 - Replace the development-only `x-dataset-role` header with real API authentication and role mapping.
 - Store lakeFS access keys and object-store credentials in a secret manager.
 - Use persistent PostgreSQL storage with backups and restore drills.
-- Use a durable S3-compatible backend, not the container-local blockstore.
+- Use the MinIO Docker volume for object data, and back up that volume according
+  to the dataset retention policy.
 - Configure branch protection for `main` and release branches/tags.
 - Run lakeFS garbage collection only with a retention policy tied to dataset reproducibility.
 
@@ -136,9 +180,9 @@ Implementation requirements:
 
 ## S3-Compatible Backend
 
-The Dataset API should not depend on MinIO-specific concepts. Configure backends
-through `StorageBackendProfile` and bind repositories through immutable
-`RepositoryStorageBinding` records.
+The production default is MinIO, but the Dataset API should not depend on
+MinIO-specific concepts. Configure backends through `StorageBackendProfile` and
+bind repositories through immutable `RepositoryStorageBinding` records.
 
 Example backend profile:
 
@@ -146,7 +190,7 @@ Example backend profile:
 storage_backends:
   primary:
     type: minio
-    endpoint: https://object-store.internal
+    endpoint: http://minio:9000
     region: us-east-1
     bucket: lakefs-blockstore
     namespace_prefix: datasets
@@ -169,13 +213,33 @@ migration must be a separate freeze-copy-verify-cutover process.
 
 ## Shutdown And Data Removal
 
-For local verification containers:
+For the production Docker stack:
 
 ```bash
-docker kill dataset-warehouse-lakefs dataset-warehouse-lakefs-postgres
-docker rm dataset-warehouse-lakefs dataset-warehouse-lakefs-postgres
-docker network rm dataset-warehouse-lakefs
+docker compose \
+  --env-file .env \
+  -f deploy/docker-compose.production.yml \
+  -p dataset-warehouse \
+  down
 ```
 
-This removes the local container state created by the commands above. It does
-not remove downloaded Docker images.
+This stops containers but preserves Docker volumes.
+
+To delete local data after a verification run:
+
+```bash
+docker compose \
+  --env-file .env \
+  -f deploy/docker-compose.production.yml \
+  -p dataset-warehouse \
+  down -v
+```
+
+The volumes are explicitly named:
+
+```text
+dataset-warehouse-postgres-data
+dataset-warehouse-minio-data
+```
+
+Removing those volumes deletes lakeFS metadata and stored dataset objects.
