@@ -1,7 +1,7 @@
 storage_backends:
   primary:
     type: minio
-    endpoint: https://object-store.internal
+    endpoint: http://minio:9000
     region: us-east-1
     bucket: lakefs-blockstore
     namespace_prefix: datasets
