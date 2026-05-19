@@ -142,4 +142,23 @@ describe("dataset api", () => {
       commit_id: commitBody.commit_id,
     });
   });
+
+  test("routes merges when the source branch name contains a merge segment", async () => {
+    const merge = await request(
+      "/api/repos/llm-datasets/branches/feature/merge/v1/merge/staging",
+      {
+        method: "POST",
+        headers: { "x-dataset-role": "data-engineer" },
+        body: JSON.stringify({ message: "promote branch with merge segment" }),
+      },
+    );
+
+    expect(merge.status).toBe(200);
+    const body = await merge.json();
+    expect(body).toMatchObject({
+      repo: "llm-datasets",
+      source: "feature/merge/v1",
+      target: "staging",
+    });
+  });
 });

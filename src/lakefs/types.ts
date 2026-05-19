@@ -11,6 +11,12 @@ export interface LakeFSListObjectsInput {
   prefix?: string;
 }
 
+export interface LakeFSStatObjectInput {
+  repo: string;
+  ref: string;
+  path: string;
+}
+
 export interface LakeFSCreateBranchInput {
   repo: string;
   name: string;
@@ -45,6 +51,7 @@ export interface LakeFSCreateTagInput {
 
 export interface LakeFSClient {
   listObjects(input: LakeFSListObjectsInput): Promise<LakeFSObject[]>;
+  statObject(input: LakeFSStatObjectInput): Promise<LakeFSObject | undefined>;
   createBranch(input: LakeFSCreateBranchInput): Promise<{ repo: string; branch: string; sourceRef: string }>;
   presignUpload(input: LakeFSPresignInput): Promise<{ url: string; expiresIn: number }>;
   presignDownload(input: LakeFSPresignInput): Promise<{ url: string; expiresIn: number }>;

@@ -1,16 +1,17 @@
 import { createDatasetApi } from "./api/server";
+import { resolveServerPort } from "./config/server";
 import { createDatasetService } from "./datasets/service";
 import { createMemoryLakeFSClient } from "./lakefs/memory";
 
-const port = Number(process.env.DATASET_API_PORT ?? "3000");
+const port = resolveServerPort(Bun.argv, process.env);
 
 const lakefs = createMemoryLakeFSClient();
 const service = createDatasetService({ lakefs });
 const api = createDatasetApi({ service });
 
-Bun.serve({
-  port,
+const server = Bun.serve({
+  ...(port === undefined ? {} : { port }),
   fetch: (request) => api.fetch(request),
 });
 
-console.log(`Dataset API listening on http://localhost:${port}`);
+console.log(`Dataset API listening on http://localhost:${server.port}`);

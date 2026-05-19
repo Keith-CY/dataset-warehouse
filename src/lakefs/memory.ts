@@ -41,6 +41,25 @@ export function createMemoryLakeFSClient(options: MemoryLakeFSOptions = {}): Lak
         }));
     },
 
+    async statObject(input) {
+      const object = objects.find(
+        (candidate) =>
+          candidate.repo === input.repo &&
+          candidate.ref === input.ref &&
+          candidate.path === input.path,
+      );
+      if (!object) {
+        return undefined;
+      }
+      const { path, bytes, modifiedAt, checksum } = object;
+      return {
+        path,
+        bytes,
+        ...(modifiedAt ? { modifiedAt } : {}),
+        ...(checksum ? { checksum } : {}),
+      };
+    },
+
     async createBranch(input: LakeFSCreateBranchInput) {
       branches.set(branchKey(input.repo, input.name), input.sourceRef);
       return { repo: input.repo, branch: input.name, sourceRef: input.sourceRef };

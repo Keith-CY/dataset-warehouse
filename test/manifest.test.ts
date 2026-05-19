@@ -90,8 +90,47 @@ describe("dataset manifest validation", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("sample_count must equal the sum of shard samples");
     expect(result.errors).toContain("shards[1].path must stay inside the dataset directory");
-    expect(result.errors).toContain("shards[1] object is missing");
+    expect(result.errors).not.toContain("shards[1] object is missing");
     expect(result.errors).toContain("shards[0].sha256 does not match object metadata");
     expect(result.errors).toContain("shards[2].bytes does not match object metadata");
+  });
+
+  test("does not check object metadata for unsafe shard paths", () => {
+    const result = validateDatasetManifest(
+      {
+        ...validManifest,
+        sample_count: 1,
+        token_count: 10,
+        shards: [
+          {
+            ...validManifest.shards[0],
+            path: "../escape.parquet",
+          },
+        ],
+      },
+      {
+        datasetRoot: "pretrain/mix/v1",
+        objects: new Map(),
+      },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("shards[0].path must stay inside the dataset directory");
+    expect(result.errors).not.toContain("shards[0] object is missing");
+  });
+
+  test("requires strict ISO 8601 timestamps", () => {
+    const result = validateDatasetManifest(
+      {
+        ...validManifest,
+        created_at: "2026",
+      },
+      {
+        datasetRoot: "pretrain/mix/v1",
+      },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("created_at must be an ISO 8601 UTC timestamp");
   });
 });

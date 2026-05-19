@@ -71,10 +71,11 @@ export function validateDatasetManifest(
     const safePath = normalizeRelativePath(shard.path);
     if (!safePath) {
       errors.push(`shards[${index}].path must stay inside the dataset directory`);
+      return;
     }
 
     if (options.objects) {
-      const objectPath = safePath ? joinObjectPath(root, safePath) : joinObjectPath(root, shard.path);
+      const objectPath = joinObjectPath(root, safePath);
       const metadata = options.objects.get(objectPath);
       if (!metadata) {
         errors.push(`shards[${index}] object is missing`);
@@ -195,10 +196,31 @@ function requiredString(value: unknown, label: string, errors: string[]): string
 
 function requiredIsoDate(value: unknown, label: string, errors: string[]): string {
   const text = requiredString(value, label, errors);
-  if (text && Number.isNaN(Date.parse(text))) {
-    errors.push(`${label} must be an ISO timestamp`);
+  if (text && !isStrictUtcIsoTimestamp(text)) {
+    errors.push(`${label} must be an ISO 8601 UTC timestamp`);
   }
   return text;
+}
+
+function isStrictUtcIsoTimestamp(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value)) {
+    return false;
+  }
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return false;
+  }
+  return new Date(timestamp).toISOString() === normalizeIsoFraction(value);
+}
+
+function normalizeIsoFraction(value: string): string {
+  if (!value.includes(".")) {
+    return value.replace("Z", ".000Z");
+  }
+  return value.replace(/\.(\d{1,9})Z$/, (_match, fraction: string) => {
+    const milliseconds = fraction.padEnd(3, "0").slice(0, 3);
+    return `.${milliseconds}Z`;
+  });
 }
 
 function requiredNonNegativeInteger(value: unknown, label: string, errors: string[]): number {

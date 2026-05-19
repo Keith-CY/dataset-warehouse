@@ -24,7 +24,7 @@ object storage backends.
 ```bash
 bun test
 node ./node_modules/typescript/bin/tsc --noEmit
-bun src/main.ts
+bun --port 3000 src/main.ts
 ```
 
 The development server uses an in-memory lakeFS client. Production integration

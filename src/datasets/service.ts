@@ -178,20 +178,34 @@ export function createDatasetService({ lakefs }: { lakefs: LakeFSClient }): Data
 
     async validateManifest(input) {
       requireWritableBranch(input.role, input.branch);
-      const objects = await lakefs.listObjects({
-        repo: input.repo,
-        ref: input.branch,
-        prefix: normalizePrefix(input.datasetPath),
+      const structuralResult = validateDatasetManifest(input.manifest, {
+        datasetRoot: input.datasetPath,
       });
-      const objectMap = new Map(
-        objects.map((object) => [
-          object.path,
-          {
+
+      if (!structuralResult.valid || !structuralResult.manifest) {
+        return {
+          valid: false,
+          errors: structuralResult.errors,
+        };
+      }
+
+      const datasetRoot = normalizePrefix(input.datasetPath);
+      const objectMap = new Map();
+      for (const shard of structuralResult.manifest.shards) {
+        const objectPath = joinObjectPath(datasetRoot, shard.path);
+        const object = await lakefs.statObject({
+          repo: input.repo,
+          ref: input.branch,
+          path: objectPath,
+        });
+        if (object) {
+          objectMap.set(object.path, {
             bytes: object.bytes,
             ...(object.checksum ? { sha256: object.checksum } : {}),
-          },
-        ]),
-      );
+          });
+        }
+      }
+
       const result = validateDatasetManifest(input.manifest, {
         datasetRoot: input.datasetPath,
         objects: objectMap,
@@ -261,4 +275,8 @@ function requireMergePermission(role: DatasetRole, source: string, target: strin
 
 function normalizePrefix(prefix: string): string {
   return prefix.replace(/^\/+|\/+$/g, "");
+}
+
+function joinObjectPath(root: string, path: string): string {
+  return [root, path].filter(Boolean).join("/");
 }

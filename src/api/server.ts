@@ -163,7 +163,7 @@ async function handleBranchRoute(
     );
   }
 
-  const mergeIndex = segments.indexOf("merge", 4);
+  const mergeIndex = segments.lastIndexOf("merge");
   if (request.method === "POST" && mergeIndex > 4) {
     const body = await readJsonObject(request);
     const source = branchFromSegments(segments, 4, mergeIndex);
