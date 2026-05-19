@@ -74,7 +74,7 @@ Load credentials from a secret file or environment variables:
 ```bash
 . /data/credentials/dataset-warehouse.env
 
-LAKEFS_API="http://lakefs.example.internal:19100/api/v1"
+LAKEFS_API="http://lakefs.example.internal:8000/api/v1"
 REPO=llm-datasets
 ```
 
@@ -125,7 +125,8 @@ Read object content:
 
 ```bash
 curl -sS -u "$LAKEFS_ACCESS_KEY_ID:$LAKEFS_SECRET_ACCESS_KEY" \
-  "$LAKEFS_API/repositories/$REPO/refs/main/objects?path=probes/example.txt"
+  "$LAKEFS_API/repositories/$REPO/refs/main/objects?path=probes/example.txt" \
+  -o example.txt
 ```
 
 For paths or prefixes with spaces, `#`, `?`, non-ASCII characters, or other
