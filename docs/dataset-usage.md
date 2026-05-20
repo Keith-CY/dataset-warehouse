@@ -3,6 +3,9 @@
 This document shows the intended dataset workflows: query, pull, upload,
 validate, commit, merge, and release.
 
+For dataset root layout, config directories, split naming, dataset cards, and
+row-shape conventions, see [Dataset Format Convention](dataset-format.md).
+
 The examples use:
 
 ```bash
@@ -50,7 +53,7 @@ Example production request shape:
 ```bash
 curl -sS \
   -H "Authorization: Bearer $DATASET_API_TOKEN" \
-  "$BASE/api/repos/$REPO/refs/7f23a9d4c0/objects?prefix=pretrain/mix/v1/"
+  "$BASE/api/repos/$REPO/refs/7f23a9d4c0/objects?prefix=pretrain-mix-v1/"
 ```
 
 The bearer-token form above is the intended production client shape. The current
@@ -154,7 +157,7 @@ List objects under a ref and prefix:
 
 ```bash
 curl -sS -H 'x-dataset-role: viewer' \
-  "$BASE/api/repos/$REPO/refs/main/objects?prefix=pretrain/mix/v1/"
+  "$BASE/api/repos/$REPO/refs/main/objects?prefix=pretrain-mix-v1/"
 ```
 
 Production training should not use `main` directly. Query by commit ID or a
@@ -162,7 +165,7 @@ release tag resolved to a commit ID when possible:
 
 ```bash
 curl -sS -H 'x-dataset-role: viewer' \
-  "$BASE/api/repos/$REPO/refs/7f23a9d4c0/objects?prefix=pretrain/mix/v1/"
+  "$BASE/api/repos/$REPO/refs/7f23a9d4c0/objects?prefix=pretrain-mix-v1/"
 ```
 
 ## Pull A Dataset
@@ -171,7 +174,7 @@ Use the API to request a download URL for a specific object:
 
 ```bash
 curl -sS -H 'x-dataset-role: trainer' \
-  "$BASE/api/repos/$REPO/refs/7f23a9d4c0/presign-download?path=pretrain/mix/v1/manifest.json"
+  "$BASE/api/repos/$REPO/refs/7f23a9d4c0/presign-download?path=pretrain-mix-v1/manifest.json"
 ```
 
 The response shape is:
@@ -197,8 +200,8 @@ must record:
 dataset:
   repo: llm-datasets
   ref: "7f23a9d4c0"
-  path: "pretrain/mix/v1/"
-  manifest: "pretrain/mix/v1/manifest.json"
+  path: "pretrain-mix-v1"
+  manifest: "pretrain-mix-v1/manifest.json"
   manifest_sha256: "..."
 ```
 
@@ -223,14 +226,14 @@ Request a presigned upload URL for each object:
 curl -sS -X POST \
   -H "$ROLE_HEADER" \
   -H 'content-type: application/json' \
-  --data '{"path":"pretrain/mix/v1/shards/shard-00000.parquet"}' \
+  --data '{"path":"pretrain-mix-v1/data/default/train-00000-of-00001.parquet"}' \
   "$BASE/api/repos/$REPO/branches/exp/alice/pretrain-v1/presign-upload"
 ```
 
 Upload the file with the returned URL:
 
 ```bash
-curl -X PUT --upload-file shard-00000.parquet "$URL"
+curl -X PUT --upload-file train-00000-of-00001.parquet "$URL"
 ```
 
 Upload `manifest.json` after all shards are present:
@@ -239,7 +242,7 @@ Upload `manifest.json` after all shards are present:
 curl -sS -X POST \
   -H "$ROLE_HEADER" \
   -H 'content-type: application/json' \
-  --data '{"path":"pretrain/mix/v1/manifest.json"}' \
+  --data '{"path":"pretrain-mix-v1/manifest.json"}' \
   "$BASE/api/repos/$REPO/branches/exp/alice/pretrain-v1/presign-upload"
 ```
 
@@ -264,7 +267,7 @@ Each trainable dataset directory must include `manifest.json`:
   },
   "shards": [
     {
-      "path": "shards/shard-00000.parquet",
+      "path": "data/default/train-00000-of-00001.parquet",
       "bytes": 134217728,
       "samples": 1000000,
       "tokens": 4700000000,
@@ -299,7 +302,7 @@ curl -sS -X POST \
 
 ```json
 {
-  "dataset_path": "pretrain/mix/v1",
+  "dataset_path": "pretrain-mix-v1",
   "manifest": {
     "dataset_name": "pretrain-mix-v1",
     "created_at": "2026-05-19T10:00:00Z",
@@ -316,7 +319,7 @@ curl -sS -X POST \
     },
     "shards": [
       {
-        "path": "shards/shard-00000.parquet",
+        "path": "data/default/train-00000-of-00001.parquet",
         "bytes": 134217728,
         "samples": 1000000,
         "tokens": 4700000000,
